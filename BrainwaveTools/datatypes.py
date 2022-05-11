@@ -1,7 +1,9 @@
-from dataclasses import dataclass
-import numpy as np
-from abc import abstractmethod
+from __future__ import annotations
+
 import pickle
+from dataclasses import dataclass
+
+import numpy as np
 
 
 class FileMixin:
@@ -10,7 +12,7 @@ class FileMixin:
             pickle.dump(self, f, protocol=2)
 
     @classmethod
-    def read(cls, path):
+    def read(cls, path) -> FileMixin:
         with open(path, 'rb') as f:
             return pickle.load(f)
 

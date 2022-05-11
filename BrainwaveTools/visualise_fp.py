@@ -1,6 +1,9 @@
-import tdt
 import argparse
+
+import numpy as np
+
 from datatypes import FiberPhotometryData
+import matplotlib.pyplot as plt
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -12,20 +15,25 @@ def init_argparse() -> argparse.ArgumentParser:
         "-v", "--version", action="version",
         version=f"{parser.prog} version 1.0.0"
     )
-    parser.add_argument('block', nargs=1, type=str)
-    parser.add_argument('output', nargs=1, type=str)
+    parser.add_argument('file', nargs=1, type=str)
     return parser
-
-
-def tdt_to_fiber_photometry_data(path: str):
-    data = tdt.read_block(path)
-    return FiberPhotometryData(data=data.streams.LMag.data, fs=data.streams.LMag.fs)
 
 
 def main() -> None:
     parser = init_argparse()
     args = parser.parse_args()
-    tdt_to_fiber_photometry_data(args.block[0]).write(args.output[0])
+
+    fp = FiberPhotometryData.read(args.file[0])
+
+    ticks = np.arange(fp.shape[1]) * fp.frequency
+
+    print(fp.frequency)
+
+    plt.plot(ticks, fp.data[0])
+
+    plt.xlabel("Time (s)")
+
+    plt.show()
 
 
 if __name__ == "__main__":
