@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import pickle
+import dill
 from dataclasses import dataclass
 
 import numpy as np
+
+from numpy.lib.stride_tricks import sliding_window_view
 
 
 class FileMixin:
     def write(self, path):
         with open(path, 'wb') as f:
-            pickle.dump(self, f, protocol=2)
+            dill.dump(self, f, protocol=2)
 
     @classmethod
     def read(cls, path) -> FileMixin:
         with open(path, 'rb') as f:
-            return pickle.load(f)
+            return dill.load(f)
 
 
 @dataclass
@@ -40,3 +42,6 @@ class FiberPhotometryData(FileMixin):
     @property
     def shape(self) -> tuple:
         return self.data.shape
+
+    def sliding_window(self, window_shape: int) -> np.ndarray:
+        return sliding_window_view(self.data.flatten(), window_shape)
