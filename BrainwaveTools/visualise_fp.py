@@ -2,7 +2,7 @@ import argparse
 
 import numpy as np
 
-from datatypes import FiberPhotometryData
+from datatypes import FiberPhotometryData, FiberPhotometryWindowData
 import matplotlib.pyplot as plt
 
 
@@ -22,12 +22,9 @@ def init_argparse() -> argparse.ArgumentParser:
 def main() -> None:
     parser = init_argparse()
     args = parser.parse_args()
-
     fp = FiberPhotometryData.read(args.file[0])
 
     ticks = np.arange(fp.shape[1]) * fp.frequency
-
-    print(fp.frequency)
 
     plt.plot(ticks, fp.data[0])
 
