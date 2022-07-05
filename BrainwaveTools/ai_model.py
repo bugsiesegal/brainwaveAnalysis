@@ -26,12 +26,12 @@ class AutoEncoderModel:
     def make_model(self):
         enc_in = Input((self.window_size,))
         x = Sequential([
-            Dense(self.window_size * 4) for i in range(self.num_hidden_layers)
+            Dense(self.window_size * 8) for i in range(self.num_hidden_layers)
         ])(enc_in)
         enc_out = Dense(self.encoded_size, activation="sigmoid")(x)
         dec_in = Dense(self.encoded_size)(enc_out)
         x = Sequential([
-            Dense(self.window_size * 4) for i in range(self.num_hidden_layers)
+            Dense(self.window_size * 8) for i in range(self.num_hidden_layers)
         ])(dec_in)
         dec_out = Dense(self.window_size, activation="sigmoid")(x)
 
@@ -39,12 +39,12 @@ class AutoEncoderModel:
         self.decoder = Model(inputs=dec_in, outputs=dec_out)
         self.model = Model(inputs=enc_in, outputs=dec_out)
         lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=1e-4,
+            initial_learning_rate=1e-5,
             decay_steps=10000,
             decay_rate=0.9)
         opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         lr_metric = get_lr_metric(opt)
-        self.model.compile(optimizer=opt, loss="mae", metrics=[tf.keras.metrics.Accuracy(), lr_metric])
+        self.model.compile(optimizer=opt, loss="mse", metrics=['binary_accuracy', lr_metric])
 
     def summary(self):
         print(self.model.summary())
