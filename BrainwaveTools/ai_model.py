@@ -61,18 +61,19 @@ class CNNAutoEncoderModel:
     def __init__(self, window_size):
         self.window_size = window_size
 
-    def make_model(self):
+    def make_model(self, initial_learning_rate=1e-4, decay_steps=20000, decay_rate=0.9):
         enc_in = Input((self.window_size,))
         x = Reshape((1, self.window_size))(enc_in)
         x1 = Sequential([
-                            Convolution1DTranspose(10, 10) for i in range(6)
+                            Convolution1DTranspose(50, 50) for i in range(6)
                         ] + [
-                            Conv1D(10, 10) for i in range(6)
+                            Conv1D(50, 50) for i in range(6)
                         ])(x)
         enc_out = Dense(10, activation="sigmoid")(x1)
         dec_in = Dense(10)(enc_out)
-        x2 = Sequential([Convolution1DTranspose(10, 10) for i in range(6)]
-                        + [Conv1D(10, 10) for i in range(5)])(dec_in)
+        x2 = Sequential([Convolution1DTranspose(50, 50) for i in range(6)]
+                        + [Conv1D(50, 50) for i in range(6)])(dec_in)
+        x2 = Dense(100)(x2)
         x3 = Reshape((self.window_size,))(x2)
         dec_out = Dense(self.window_size, activation="sigmoid")(x3)
 
@@ -88,4 +89,4 @@ class CNNAutoEncoderModel:
         self.model.compile(optimizer=opt, loss="mse", metrics=['binary_accuracy', lr_metric])
 
     def summary(self):
-        print(self.model.summary())
+        print(self.model.summary(expand_nested=True))
