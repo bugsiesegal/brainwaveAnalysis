@@ -1,0 +1,18 @@
+program: ai_train.py
+method: bayes
+metric:
+  goal: maximize
+  name: binary_accuracy
+parameters:
+  initial_learning_rate:
+    max: 0.2
+    min: 1e-9
+    distribution: uniform
+  decay_steps:
+    max: 40000
+    min: 100
+    distribution: int_uniform
+  decay_rate:
+    max: 1.0
+    min: 0.1
+    distribution: uniform

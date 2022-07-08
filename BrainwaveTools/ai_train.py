@@ -11,11 +11,20 @@ import tensorflow as tf
 import wandb
 from wandb.keras import WandbCallback
 
-wandb.init(project="Fiber-Photometry-Autoencoder", entity="bugsiesegal")
+hyperparameter_defaults = dict(
+    initial_learning_rate=1e-4,
+    decay_steps=20000,
+    decay_rate=0.9
+    )
+
+
+wandb.init(project="Fiber-Photometry-Autoencoder", entity="bugsiesegal", config=hyperparameter_defaults)
+
+config = wandb.config
 
 autoencoder = ai_model.CNNAutoEncoderModel(100)
 
-autoencoder.make_model()
+autoencoder.make_model(config)
 autoencoder.summary()
 
 training_data = datatypes.FiberPhotometryWindowData.read("C:\\Users\\bugsi\\PycharmProjects\\brainwaveAnalysis\\Test"
@@ -32,10 +41,10 @@ data = scaler.transform(training_data.data)
 X_train, X_test, y_train, y_test = train_test_split(data, data, test_size=0.33,
                                                     random_state=42)
 
-autoencoder.model.fit(X_train, y_train, epochs=30000, validation_split=0.1,
-                      callbacks=[WandbCallback()], batch_size=1024)
+autoencoder.model.fit(X_train, y_train, epochs=5, validation_split=0.1,
+                      callbacks=[WandbCallback()])
 
-autoencoder.model.evaluate(data[0:2].reshape((-1, 100)), data[0:2].reshape((-1, 100)))
+autoencoder.model.evaluate(X_test, y_test)
 
 autoencoder.model.save("C:/Users/bugsi/PycharmProjects/brainwaveAnalysis/Data/models/autoencoder.h5")
 
@@ -48,4 +57,6 @@ axs[0].plot(data[0])
 axs[1].plot(autoencoder.model.predict(data[0].reshape((1, -1))).reshape((-1,)))
 axs[2].bar([i for i in range(10)], autoencoder.encoder.predict(data[0].reshape((1, -1))).reshape((-1,)))
 
-plt.show()
+wandb.log({"output figure": plt.gcf()})
+
+wandb.finish()

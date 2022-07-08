@@ -61,7 +61,7 @@ class CNNAutoEncoderModel:
     def __init__(self, window_size):
         self.window_size = window_size
 
-    def make_model(self, initial_learning_rate=1e-4, decay_steps=20000, decay_rate=0.9):
+    def make_model(self, config):
         enc_in = Input((self.window_size,))
         x = Reshape((1, self.window_size))(enc_in)
         x1 = Sequential([
@@ -81,9 +81,9 @@ class CNNAutoEncoderModel:
         self.decoder = Model(inputs=dec_in, outputs=dec_out)
         self.model = Model(inputs=enc_in, outputs=dec_out)
         lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=1e-4,
-            decay_steps=20000,
-            decay_rate=0.9)
+            initial_learning_rate=config["initial_learning_rate"],
+            decay_steps=config["decay_steps"],
+            decay_rate=config["decay_rate"])
         opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         lr_metric = get_lr_metric(opt)
         self.model.compile(optimizer=opt, loss="mse", metrics=['binary_accuracy', lr_metric])
