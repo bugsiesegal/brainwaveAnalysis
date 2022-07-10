@@ -1,6 +1,6 @@
 import os
 
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import RobustScaler
 
 import datatypes
 
@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import wandb
+from keras import backend as be
 from wandb.keras import WandbCallback
 
 hyperparameter_defaults = dict(
@@ -27,24 +28,28 @@ autoencoder = ai_model.CNNAutoEncoderModel(100)
 autoencoder.make_model(config)
 autoencoder.summary()
 
-training_data = datatypes.FiberPhotometryWindowData.read("C:\\Users\\bugsi\\PycharmProjects\\brainwaveAnalysis\\Test"
+data = datatypes.FiberPhotometryWindowData.read("C:\\Users\\bugsi\\PycharmProjects\\brainwaveAnalysis\\Data"
                                                          "\\fpw\\0.fpw")
+
+training_data = tf.data.Dataset.from_tensor_slices((data.data, data.data))
+
+training_data = training_data.batch(32)
 
 trained_model_artifact = wandb.Artifact("CNNautoencoderV1", type="model")
 
-scaler = MinMaxScaler()
+# scaler = RobustScaler()
+#
+# scaler.fit(training_data.data)
+#
+# data = scaler.transform(training_data.data)
 
-scaler.fit(training_data.data)
+# X_train, X_test, y_train, y_test = train_test_split(data, data, test_size=0.33,
+#                                                     random_state=42)
 
-data = scaler.transform(training_data.data)
-
-X_train, X_test, y_train, y_test = train_test_split(data, data, test_size=0.33,
-                                                    random_state=42)
-
-autoencoder.model.fit(X_train, y_train, epochs=5, validation_split=0.1,
+autoencoder.model.fit(training_data, epochs=1,
                       callbacks=[WandbCallback()])
 
-autoencoder.model.evaluate(X_test, y_test)
+autoencoder.model.evaluate(training_data)
 
 autoencoder.model.save("C:/Users/bugsi/PycharmProjects/brainwaveAnalysis/Data/models/autoencoder.h5")
 
@@ -53,9 +58,9 @@ wandb.run.log_artifact(trained_model_artifact)
 
 fig, axs = plt.subplots(3)
 
-axs[0].plot(data[0])
-axs[1].plot(autoencoder.model.predict(data[0].reshape((1, -1))).reshape((-1,)))
-axs[2].bar([i for i in range(10)], autoencoder.encoder.predict(data[0].reshape((1, -1))).reshape((-1,)))
+axs[0].plot(data.data[0])
+axs[1].plot(autoencoder.model.predict(data.data[0].reshape((1, -1))).reshape((-1,)))
+axs[2].bar([i for i in range(10)], autoencoder.encoder.predict(data.data[0].reshape((1, -1))).reshape((-1,)))
 
 wandb.log({"output figure": plt.gcf()})
 

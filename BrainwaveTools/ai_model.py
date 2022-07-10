@@ -26,7 +26,7 @@ class AutoEncoderModel:
         self.encoded_size = encoded_size
         self.num_hidden_layers = num_hidden_layers
 
-    def make_model(self):
+    def make_model(self, config):
         enc_in = Input((self.window_size,))
         x = Sequential([
             Dense(self.window_size * 8) for i in range(self.num_hidden_layers)
@@ -42,9 +42,9 @@ class AutoEncoderModel:
         self.decoder = Model(inputs=dec_in, outputs=dec_out)
         self.model = Model(inputs=enc_in, outputs=dec_out)
         lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=1e-5,
-            decay_steps=10000,
-            decay_rate=0.9)
+            initial_learning_rate=config["initial_learning_rate"],
+            decay_steps=config["decay_step"],
+            decay_rate=config["decay_rate"])
         opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
         lr_metric = get_lr_metric(opt)
         self.model.compile(optimizer=opt, loss="mse", metrics=['binary_accuracy', lr_metric])
@@ -65,15 +65,15 @@ class CNNAutoEncoderModel:
         enc_in = Input((self.window_size,))
         x = Reshape((1, self.window_size))(enc_in)
         x1 = Sequential([
-                            Convolution1DTranspose(50, 50) for i in range(6)
+                            Convolution1DTranspose(10, 10) for i in range(6)
                         ] + [
-                            Conv1D(50, 50) for i in range(6)
+                            Conv1D(10, 10) for i in range(6)
                         ])(x)
         enc_out = Dense(10, activation="sigmoid")(x1)
         dec_in = Dense(10)(enc_out)
-        x2 = Sequential([Convolution1DTranspose(50, 50) for i in range(6)]
-                        + [Conv1D(50, 50) for i in range(6)])(dec_in)
-        x2 = Dense(100)(x2)
+        x2 = Sequential([Convolution1DTranspose(10, 10) for i in range(6)]
+                        + [Conv1D(10, 10) for i in range(5)])(dec_in)
+        # x2 = Dense(100)(x2)
         x3 = Reshape((self.window_size,))(x2)
         dec_out = Dense(self.window_size, activation="sigmoid")(x3)
 
