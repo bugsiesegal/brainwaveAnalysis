@@ -1,6 +1,8 @@
+import math
 import os
 
-from sklearn.preprocessing import RobustScaler
+import keras.models
+from sklearn.preprocessing import RobustScaler, MinMaxScaler
 
 import datatypes
 
@@ -13,55 +15,61 @@ from keras import backend as be
 from wandb.keras import WandbCallback
 
 hyperparameter_defaults = dict(
-    initial_learning_rate=1e-4,
-    decay_steps=20000,
-    decay_rate=0.9
-    )
+    learning_rate=0.017089103647893028,
+    initial_accumulator_value=0.1,
+    epochs=1000,
+    window_size=100,
+    compression_size=10,
+    hidden_layer_stacks=4
+)
 
-
-wandb.init(project="Fiber-Photometry-Autoencoder", entity="bugsiesegal", config=hyperparameter_defaults)
+# tf.compat.v1.disable_eager_execution()
+run = wandb.init(project="brainwaveAnalysis-BrainwaveTools", entity="bugsiesegal", config=hyperparameter_defaults)
 
 config = wandb.config
 
-autoencoder = ai_model.CNNAutoEncoderModel(100)
+print(config)
+
+autoencoder = ai_model.CNNAutoEncoderModel(config["window_size"], config["compression_size"], hidden_layer_stacks=config["hidden_layer_stacks"])
 
 autoencoder.make_model(config)
 autoencoder.summary()
 
-data = datatypes.FiberPhotometryWindowData.read("C:\\Users\\bugsi\\PycharmProjects\\brainwaveAnalysis\\Data"
-                                                         "\\fpw\\0.fpw")
-
-training_data = tf.data.Dataset.from_tensor_slices((data.data, data.data))
-
-training_data = training_data.batch(32)
-
-trained_model_artifact = wandb.Artifact("CNNautoencoderV1", type="model")
-
-# scaler = RobustScaler()
+# best_model = wandb.restore('model.h5', run_path="bugsiesegal/brainwaveAnalysis-BrainwaveToolsV1.1/2pzv4332")
 #
-# scaler.fit(training_data.data)
-#
-# data = scaler.transform(training_data.data)
+# autoencoder.model.load_weights(best_model.name)
 
-# X_train, X_test, y_train, y_test = train_test_split(data, data, test_size=0.33,
-#                                                     random_state=42)
+data = datatypes.FiberPhotometryWindowData.read("C:/Users/bugsi/PycharmProjects/brainwaveAnalysis/Test"
+                                                "/fpw/0.fpw")
 
-autoencoder.model.fit(training_data, epochs=1,
-                      callbacks=[WandbCallback()])
+scaler = MinMaxScaler()
 
-autoencoder.model.evaluate(training_data)
+data = scaler.fit_transform(data.data)
 
-autoencoder.model.save("C:/Users/bugsi/PycharmProjects/brainwaveAnalysis/Data/models/autoencoder.h5")
+X_train, X_test, y_train, y_test = train_test_split(data[:20], data[:20],
+                                                    test_size=0.33,
+                                                    random_state=42)
 
-trained_model_artifact.add_dir("C:/Users/bugsi/PycharmProjects/brainwaveAnalysis/Data/models/")
-wandb.run.log_artifact(trained_model_artifact)
+# model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+#     filepath="C:/Users/bugsi/PycharmProjects/brainwaveAnalysis/Data/models/model.h5",
+#     save_weights_only=True,
+#     monitor='val_accuracy',
+#     mode='max',
+#     save_best_only=True)
+
+autoencoder.model.fit(X_train, y_train, epochs=config["epochs"], validation_split=0.1, batch_size=2 ** 10,
+                      callbacks=[WandbCallback(save_model=False)])
+
+# autoencoder.model.evaluate(X_test, y_test)
 
 fig, axs = plt.subplots(3)
 
-axs[0].plot(data.data[0])
-axs[1].plot(autoencoder.model.predict(data.data[0].reshape((1, -1))).reshape((-1,)))
-axs[2].bar([i for i in range(10)], autoencoder.encoder.predict(data.data[0].reshape((1, -1))).reshape((-1,)))
+axs[0].plot(X_train[0])
+axs[1].plot(autoencoder.model.predict(X_train[0].reshape((1, -1))).reshape((-1,)))
+axs[2].bar([i for i in range(10)], autoencoder.encoder.predict(X_train[0].reshape((1, -1))).reshape((-1,)))
 
 wandb.log({"output figure": plt.gcf()})
+
+# wandb.save('model.h5')
 
 wandb.finish()

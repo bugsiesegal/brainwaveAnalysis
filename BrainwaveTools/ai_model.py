@@ -6,7 +6,7 @@ from keras.layers.reshaping import Reshape
 from keras.layers.rnn import TimeDistributed
 from keras.layers.convolutional import Convolution1DTranspose, Conv1D
 from keras import Sequential, Model, Input
-from keras.layers import Dense
+from keras.layers import Dense, MaxPool1D, Flatten, Attention, BatchNormalization
 
 
 def get_lr_metric(optimizer):
@@ -41,52 +41,72 @@ class AutoEncoderModel:
         self.encoder = Model(inputs=enc_in, outputs=enc_out)
         self.decoder = Model(inputs=dec_in, outputs=dec_out)
         self.model = Model(inputs=enc_in, outputs=dec_out)
-        lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=config["initial_learning_rate"],
-            decay_steps=config["decay_step"],
-            decay_rate=config["decay_rate"])
-        opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
-        lr_metric = get_lr_metric(opt)
-        self.model.compile(optimizer=opt, loss="mse", metrics=['binary_accuracy', lr_metric])
+        opt = tf.keras.optimizers.Adam(learning_rate=config["learning_rate"])
+        self.model.compile(optimizer=opt, loss="mse", metrics=['accuracy'])
 
     def summary(self):
-        print(self.model.summary())
+        print(self.model.summary(expand_nested=False))
 
 
 class CNNAutoEncoderModel:
     model: Model
-    encoder: Model
-    decoder: Model
+    encoder: Sequential
+    decoder: Sequential
 
-    def __init__(self, window_size):
+    def __init__(self, window_size, compression_size, hidden_layer_stacks=3):
         self.window_size = window_size
+        self.compression_size = compression_size
+        self.hidden_layer_stacks = hidden_layer_stacks
 
     def make_model(self, config):
-        enc_in = Input((self.window_size,))
-        x = Reshape((1, self.window_size))(enc_in)
-        x1 = Sequential([
-                            Convolution1DTranspose(10, 10) for i in range(6)
-                        ] + [
-                            Conv1D(10, 10) for i in range(6)
-                        ])(x)
-        enc_out = Dense(10, activation="sigmoid")(x1)
-        dec_in = Dense(10)(enc_out)
-        x2 = Sequential([Convolution1DTranspose(10, 10) for i in range(6)]
-                        + [Conv1D(10, 10) for i in range(5)])(dec_in)
-        # x2 = Dense(100)(x2)
-        x3 = Reshape((self.window_size,))(x2)
-        dec_out = Dense(self.window_size, activation="sigmoid")(x3)
+        self.encoder = Sequential()
+        self.decoder = Sequential()
 
-        self.encoder = Model(inputs=enc_in, outputs=enc_out)
-        self.decoder = Model(inputs=dec_in, outputs=dec_out)
-        self.model = Model(inputs=enc_in, outputs=dec_out)
-        lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=config["initial_learning_rate"],
-            decay_steps=config["decay_steps"],
-            decay_rate=config["decay_rate"])
-        opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
-        lr_metric = get_lr_metric(opt)
-        self.model.compile(optimizer=opt, loss="mse", metrics=['binary_accuracy', lr_metric])
+        self.encoder.add(Dense(self.window_size, input_shape=(self.window_size,)))
+        self.encoder.add(Reshape((1, self.window_size,)))
+        for i in range(int(self.hidden_layer_stacks/2)):
+            self.encoder.add(Dense(self.window_size, activation="relu"))
+        self.encoder.add(Dense(self.window_size, activation="relu"))
+
+        for i in range(self.hidden_layer_stacks):
+            self.encoder.add(Convolution1DTranspose(100, self.compression_size, activation="relu"))
+            # self.encoder.add(BatchNormalization())
+
+        for i in range(self.hidden_layer_stacks):
+            self.encoder.add(Conv1D(100, self.compression_size, activation="relu"))
+            # self.encoder.add(BatchNormalization())
+
+        self.encoder.add(Dense(self.compression_size, activation="relu"))
+        self.encoder.add(Flatten())
+        for i in range(int(self.hidden_layer_stacks/2)):
+            self.encoder.add(Dense(self.compression_size, activation="relu"))
+
+        self.decoder.add(Dense(self.compression_size, input_shape=(self.compression_size,), activation="relu"))
+        self.decoder.add(Reshape((1, self.compression_size,)))
+        for i in range(int(self.hidden_layer_stacks / 2)):
+            self.decoder.add(Dense(self.compression_size, activation="relu"))
+
+        for i in range(self.hidden_layer_stacks):
+            self.decoder.add(Convolution1DTranspose(100, self.compression_size, activation="relu"))
+            # self.decoder.add(BatchNormalization())
+
+        for i in range(self.hidden_layer_stacks):
+            self.decoder.add(Conv1D(100, self.compression_size, activation="relu"))
+            # self.decoder.add(BatchNormalization())
+
+        self.decoder.add(Dense(self.window_size, activation="relu"))
+        self.decoder.add(Flatten())
+        for i in range(int(self.hidden_layer_stacks / 2)):
+            self.decoder.add(Dense(self.window_size, activation="relu"))
+        self.decoder.add(Dense(self.window_size, activation="sigmoid"))
+
+
+        encoder_input = Input(shape=(self.window_size,))
+        encoder = self.encoder(encoder_input)
+        decoder = self.decoder(encoder)
+        opt = tf.keras.optimizers.Adagrad(learning_rate=config["learning_rate"], initial_accumulator_value=config["initial_accumulator_value"])
+        self.model = Model(inputs=encoder_input, outputs=decoder)
+        self.model.compile(optimizer=opt, loss="mse", metrics=['accuracy', 'mae'])
 
     def summary(self):
         print(self.model.summary(expand_nested=True))
