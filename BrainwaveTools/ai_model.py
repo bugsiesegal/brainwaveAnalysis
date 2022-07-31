@@ -65,39 +65,39 @@ class CNNAutoEncoderModel:
         self.encoder.add(Dense(self.window_size, input_shape=(self.window_size,)))
         self.encoder.add(Reshape((1, self.window_size,)))
         for i in range(int(self.hidden_layer_stacks/2)):
-            self.encoder.add(Dense(self.window_size, activation="relu"))
-        self.encoder.add(Dense(self.window_size, activation="relu"))
+            self.encoder.add(Dense(self.window_size))
+        self.encoder.add(Dense(self.window_size))
 
         for i in range(self.hidden_layer_stacks):
-            self.encoder.add(Convolution1DTranspose(100, self.compression_size, activation="relu"))
+            self.encoder.add(Convolution1DTranspose(10, self.compression_size))
             # self.encoder.add(BatchNormalization())
 
         for i in range(self.hidden_layer_stacks):
-            self.encoder.add(Conv1D(100, self.compression_size, activation="relu"))
+            self.encoder.add(Conv1D(10, self.compression_size))
             # self.encoder.add(BatchNormalization())
 
-        self.encoder.add(Dense(self.compression_size, activation="relu"))
+        self.encoder.add(Dense(self.compression_size))
         self.encoder.add(Flatten())
         for i in range(int(self.hidden_layer_stacks/2)):
-            self.encoder.add(Dense(self.compression_size, activation="relu"))
+            self.encoder.add(Dense(self.compression_size))
 
-        self.decoder.add(Dense(self.compression_size, input_shape=(self.compression_size,), activation="relu"))
+        self.decoder.add(Dense(self.compression_size, input_shape=(self.compression_size,)))
         self.decoder.add(Reshape((1, self.compression_size,)))
         for i in range(int(self.hidden_layer_stacks / 2)):
-            self.decoder.add(Dense(self.compression_size, activation="relu"))
+            self.decoder.add(Dense(self.compression_size))
 
         for i in range(self.hidden_layer_stacks):
-            self.decoder.add(Convolution1DTranspose(100, self.compression_size, activation="relu"))
+            self.decoder.add(Convolution1DTranspose(10, self.compression_size))
             # self.decoder.add(BatchNormalization())
 
         for i in range(self.hidden_layer_stacks):
-            self.decoder.add(Conv1D(100, self.compression_size, activation="relu"))
+            self.decoder.add(Conv1D(10, self.compression_size))
             # self.decoder.add(BatchNormalization())
 
-        self.decoder.add(Dense(self.window_size, activation="relu"))
+        self.decoder.add(Dense(self.window_size))
         self.decoder.add(Flatten())
         for i in range(int(self.hidden_layer_stacks / 2)):
-            self.decoder.add(Dense(self.window_size, activation="relu"))
+            self.decoder.add(Dense(self.window_size))
         self.decoder.add(Dense(self.window_size, activation="sigmoid"))
 
 
@@ -106,7 +106,48 @@ class CNNAutoEncoderModel:
         decoder = self.decoder(encoder)
         opt = tf.keras.optimizers.Adagrad(learning_rate=config["learning_rate"], initial_accumulator_value=config["initial_accumulator_value"])
         self.model = Model(inputs=encoder_input, outputs=decoder)
-        self.model.compile(optimizer=opt, loss="mse", metrics=['accuracy', 'mae'])
+        self.model.compile(optimizer=opt, loss="mae", metrics=['accuracy', 'mse'])
+
+    def summary(self):
+        print(self.model.summary(expand_nested=True))
+
+class TestModel:
+    model: Model
+    encoder: Sequential
+    decoder: Sequential
+    def __init__(self, window_size, compression_size):
+        self.window_size = window_size
+        self.compression_size = compression_size
+
+
+    def make_model(self, config):
+        self.encoder = Sequential()
+        self.decoder = Sequential()
+
+        self.encoder.add(Dense(self.window_size, input_shape=(100,), activation="sigmoid"))
+        self.encoder.add(Dense(self.window_size, activation="sigmoid"))
+        self.encoder.add(Reshape((1, self.window_size)))
+        self.encoder.add(Conv1D(self.compression_size, 1, activation="sigmoid"))
+        self.encoder.add(Flatten())
+        self.encoder.add(Dense(self.compression_size, activation="sigmoid"))
+
+        self.decoder.add(Dense(self.compression_size, input_shape=(self.compression_size,), activation="sigmoid"))
+        self.decoder.add(Reshape((1, self.compression_size)))
+        self.decoder.add(Conv1D(self.compression_size, 1, activation="sigmoid"))
+        self.decoder.add(Flatten())
+        self.decoder.add(Dense(self.window_size, activation="sigmoid"))
+        self.decoder.add(Dense(self.window_size, activation="sigmoid"))
+
+
+        encoder_input = Input(shape=(self.window_size,))
+
+        encoder = self.encoder(encoder_input)
+
+        decoder = self.decoder(encoder)
+
+        # opt = tf.keras.optimizers.Adam(learning_rate=config["learning_rate"], beta_1=config["beta_1"], beta_2=config["beta_2"])
+        self.model = Model(inputs=encoder_input, outputs=decoder)
+        self.model.compile(optimizer="adam", loss="mse", metrics=['accuracy'])
 
     def summary(self):
         print(self.model.summary(expand_nested=True))

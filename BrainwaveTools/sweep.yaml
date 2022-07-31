@@ -1,18 +1,18 @@
 program: ai_train.py
 method: bayes
 metric:
-  goal: maximize
-  name: val_accuracy
+  goal: minimize
+  name: loss
 parameters:
   learning_rate:
     max: 1.0
     min: 1e-6
     distribution: uniform
-  initial_accumulator_value:
+  beta_1:
     max: 1.0
-    min: 1e-6
+    min: 0.01
     distribution: uniform
-  hidden_layer_stacks:
-    max: 15
-    min: 2
-    distribution: int_uniform
+  beta_2:
+    max: 1.0
+    min: 0.01
+    distribution: uniform
