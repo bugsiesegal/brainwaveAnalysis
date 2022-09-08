@@ -67,4 +67,6 @@ class FiberPhotometryData(FileMixin):
         return self.data.shape
 
     def sliding_window(self, window_shape: int) -> FiberPhotometryWindowData:
-        return FiberPhotometryWindowData(self.fs, sliding_window_view(self.data.flatten(), window_shape))
+        return FiberPhotometryWindowData(self.fs,
+                                         self.data.flatten()[:self.data.flatten().size -(self.data.flatten().size % 10000)].reshape((-1, window_shape)))
+        # return FiberPhotometryWindowData(self.fs, sliding_window_view(self.data.flatten(), window_shape))
