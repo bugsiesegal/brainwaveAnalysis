@@ -2,13 +2,17 @@ program: ai_train.py
 method: bayes
 metric:
   goal: minimize
-  name: val_loss
+  name: test_loss
 parameters:
   learning_rate:
-    max: 0.1
-    min: 0.015
+    max: 0.001
+    min: 0.000001
     distribution: uniform
-  initial_accumulator_value:
-    max: 0.99
+  dropout:
+    max: 0.4
     min: 0.01
     distribution: uniform
+  num_hidden:
+    max: 10
+    min: 1
+    distribution: int_uniform

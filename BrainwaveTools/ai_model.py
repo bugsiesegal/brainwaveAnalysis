@@ -1,13 +1,15 @@
 import math
 
 import tensorflow as tf
+from keras.layers.core import activation
 from tensorflow import keras
 from keras.optimizers import Adagrad, Adam
 from keras.layers.reshaping import Reshape
 from keras.layers.rnn import TimeDistributed
 from keras.layers.convolutional import Convolution1DTranspose, Conv1D
 from keras import Sequential, Model, Input
-from keras.layers import Dense, MaxPool1D, Flatten, Attention, BatchNormalization
+from keras.layers import Dense, MaxPool1D, Flatten, Attention, BatchNormalization, AvgPool1D, UpSampling1D, Dropout, \
+    Activation
 
 
 def get_lr_metric(optimizer):
@@ -22,22 +24,35 @@ class AutoEncoderModel:
     encoder: Model
     decoder: Model
 
-    def __init__(self, window_size, encoded_size, num_hidden_layers=2):
+    def __init__(self, window_size, encoded_size, dropout, num_hidden_layers=3):
         self.window_size = window_size
         self.encoded_size = encoded_size
         self.num_hidden_layers = num_hidden_layers
+        self.dropout = dropout
 
     def make_model(self, config):
         enc_in = Input((self.window_size,))
-        x = Sequential([
-            Dense(self.window_size * 8) for i in range(self.num_hidden_layers)
-        ])(enc_in)
-        enc_out = Dense(self.encoded_size, activation="sigmoid")(x)
-        dec_in = Dense(self.encoded_size)(enc_out)
-        x = Sequential([
-            Dense(self.window_size * 8) for i in range(self.num_hidden_layers)
-        ])(dec_in)
-        dec_out = Dense(self.window_size, activation="sigmoid")(x)
+        x = Reshape((100, -1))(enc_in)
+        sequential = Sequential()
+
+        for i in range(self.num_hidden_layers):
+            sequential.add(Dense(int(100), activation="relu"))
+
+        x = sequential(x)
+        x = Flatten()(x)
+        enc_out = Dense(self.encoded_size, activation="relu")(x)
+
+        dec_in = Dense(10000, activation="relu")(enc_out)
+        x = Reshape((100, -1))(dec_in)
+        sequential = Sequential()
+
+        for i in range(self.num_hidden_layers):
+            sequential.add(Dense(int(100), activation="relu"))
+
+        x = sequential(x)
+        x = Dense(100, activation="sigmoid")(x)
+        x = Flatten()(x)
+        dec_out = Dropout(self.dropout)(x)
 
         self.encoder = Model(inputs=enc_in, outputs=enc_out)
         self.decoder = Model(inputs=dec_in, outputs=dec_out)
@@ -46,7 +61,7 @@ class AutoEncoderModel:
         self.model.compile(optimizer=opt, loss="mse", metrics=['accuracy'])
 
     def summary(self):
-        print(self.model.summary(expand_nested=False))
+        print(self.model.summary(expand_nested=True))
 
 
 class CNNAutoEncoderModel:
@@ -62,23 +77,30 @@ class CNNAutoEncoderModel:
         self.encoder = Sequential()
         self.decoder = Sequential()
 
-        self.encoder.add(Reshape((100, int(self.window_size / 100),), input_shape=(self.window_size,)))
-        self.encoder.add(Dense(int(self.window_size / 100), activation="linear"))
-        self.encoder.add(Conv1D(2 * int(self.window_size / 100), 10, padding="same", activation="linear"))
-        self.encoder.add(Conv1D(1 * int(self.window_size / 100), 10, padding="same", activation="linear"))
-        self.encoder.add(Conv1D(10, 10, padding="same", activation="linear"))
-        self.encoder.add(Conv1D(1, 10, padding="same", activation="linear"))
+        self.encoder.add(Reshape((-1, 1)))
+        self.encoder.add(Conv1D(32, 3, activation='relu', padding='same', dilation_rate=2))
+        self.encoder.add(MaxPool1D(2))
+        self.encoder.add(Conv1D(16, 3, activation='relu', padding='same', dilation_rate=2))
+        self.encoder.add(MaxPool1D(2))
+        self.encoder.add(Conv1D(8, 3, activation='relu', padding='same', dilation_rate=2))
+        self.encoder.add(MaxPool1D(2))
+        self.encoder.add(Conv1D(4, 3, activation='relu', padding='same', dilation_rate=2))
+        self.encoder.add(MaxPool1D(2))
+        self.encoder.add(AvgPool1D())
         self.encoder.add(Flatten())
-        self.encoder.add(Dense(self.compression_size, activation="linear"))
+        self.encoder.add(Dense(2500))
 
-        self.decoder.add(Dense(self.compression_size, input_shape=(self.compression_size,), activation="linear"))
-        self.decoder.add(Reshape((self.compression_size, 1)))
-        self.decoder.add(Convolution1DTranspose(1, 1, padding="same", activation="linear"))
-        self.decoder.add(Convolution1DTranspose(10, 1, padding="same", activation="linear"))
-        self.decoder.add(Convolution1DTranspose(1 * int(self.window_size / 100), 1, padding="same", activation="linear"))
-
-        self.decoder.add(Reshape((int(self.window_size / 100), 100,)))
-        self.decoder.add(Dense(100, activation="linear"))
+        self.decoder.add(Dense(5000))
+        self.decoder.add(Reshape((-1, 4)))
+        self.decoder.add(Conv1D(4, 1, strides=1, activation='relu', padding='same'))
+        self.decoder.add(UpSampling1D(2))
+        self.decoder.add(Conv1D(8, 1, strides=1, activation='relu', padding='same'))
+        self.decoder.add(UpSampling1D(2))
+        self.decoder.add(Conv1D(16, 1, strides=1, activation='relu', padding='same'))
+        self.decoder.add(UpSampling1D(2))
+        self.decoder.add(Conv1D(32, 1, strides=1, activation='relu', padding='same'))
+        self.decoder.add(UpSampling1D(2))
+        self.decoder.add(Conv1D(1, 1, strides=1, activation='relu', padding='same'))
         self.decoder.add(Flatten())
 
         encoder_input = Input(shape=(self.window_size,))
@@ -88,53 +110,6 @@ class CNNAutoEncoderModel:
                       initial_accumulator_value=config["initial_accumulator_value"])
         self.model = Model(inputs=encoder_input, outputs=decoder)
         self.model.compile(optimizer=opt, loss="mae", metrics=['accuracy'])
-
-    def summary(self):
-        print(self.model.summary(expand_nested=True))
-
-
-class TestModel:
-    model: Model
-    encoder: Sequential
-    decoder: Sequential
-
-    def __init__(self, window_size, compression_size):
-        self.window_size = window_size
-        self.compression_size = compression_size
-
-    def make_model(self, config):
-        self.encoder = Sequential()
-        self.decoder = Sequential()
-
-        self.encoder.add(Dense(self.window_size, input_shape=(100,), activation="linear"))
-        self.encoder.add(Dense(self.window_size, activation="linear"))
-        self.encoder.add(Reshape((1, self.window_size)))
-        self.encoder.add(Conv1D(2000, 1, activation="linear"))
-        self.encoder.add(Conv1D(1000, 1, activation="linear"))
-        self.encoder.add(Conv1D(10, 1, activation="linear"))
-        self.encoder.add(Flatten())
-        self.encoder.add(Dense(self.compression_size, activation="linear"))
-        self.encoder.add(Dense(self.compression_size, activation="linear"))
-
-        self.decoder.add(Dense(self.compression_size, input_shape=(self.compression_size,), activation="linear"))
-        self.decoder.add(Dense(self.compression_size, activation="linear"))
-        self.decoder.add(Reshape((1, self.compression_size)))
-        self.decoder.add(Conv1D(10, 1, activation="linear"))
-        self.decoder.add(Conv1D(1000, 1, activation="linear"))
-        self.decoder.add(Conv1D(2000, 1, activation="linear"))
-        self.decoder.add(Flatten())
-        self.decoder.add(Dense(self.window_size, activation="linear"))
-        self.decoder.add(Dense(self.window_size, activation="linear"))
-
-        encoder_input = Input(shape=(self.window_size,))
-
-        encoder = self.encoder(encoder_input)
-
-        decoder = self.decoder(encoder)
-
-        # opt = tf.keras.optimizers.Adam(learning_rate=config["learning_rate"], beta_1=config["beta_1"], beta_2=config["beta_2"])
-        self.model = Model(inputs=encoder_input, outputs=decoder)
-        self.model.compile(optimizer="adam", loss="mse", metrics=['accuracy'])
 
     def summary(self):
         print(self.model.summary(expand_nested=True))

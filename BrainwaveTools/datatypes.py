@@ -17,7 +17,6 @@ class FileMixin:
             return dill.load(f)
 
 
-@dataclass
 class FiberPhotometryWindowData(FileMixin):
     """
     fs: Data Sampling Rate.
@@ -28,6 +27,12 @@ class FiberPhotometryWindowData(FileMixin):
 
     fs: np.float
     data: np.ndarray
+    time_array: np.ndarray
+
+    def __init__(self, fs, data, time):
+        self.fs = fs
+        self.data = data
+        self.time_array = time
 
     @property
     def frequency(self) -> np.float:
@@ -67,6 +72,10 @@ class FiberPhotometryData(FileMixin):
         return self.data.shape
 
     def sliding_window(self, window_shape: int) -> FiberPhotometryWindowData:
-        return FiberPhotometryWindowData(self.fs,
-                                         self.data.flatten()[:self.data.flatten().size -(self.data.flatten().size % 10000)].reshape((-1, window_shape)))
+        w_data = self.data.flatten()[:self.data.flatten().size - (self.data.flatten().size % 10000)].reshape((-1, window_shape))
+        t_data = np.arange(0, self.data.flatten().size - (self.data.flatten().size % 10000), dtype=int).reshape((-1, window_shape))
+        return FiberPhotometryWindowData(fs=self.fs,
+                                         data=w_data,
+                                         time=t_data
+                                         )
         # return FiberPhotometryWindowData(self.fs, sliding_window_view(self.data.flatten(), window_shape))
