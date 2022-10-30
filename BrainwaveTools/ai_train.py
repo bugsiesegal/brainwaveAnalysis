@@ -48,15 +48,18 @@ autoencoder.summary()
 
 # autoencoder.model.load_weights("/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/model.h5")
 
-X_train = datatypes.FiberPhotometryWindowData.read("/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fpw/10000/2.fpw").data
+X_train = datatypes.FiberPhotometryWindowData.read("/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fpw/10000/3.fpw").data
 
-y_test = datatypes.FiberPhotometryWindowData.read("/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fpw/10000/1.fpw").data
+y_test = datatypes.FiberPhotometryWindowData.read(
+    "/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fpw/10000/1.fpw").data
 
 X_train = X_train[np.where(np.all(X_train > 0.2, axis=1))]
 
-scaler = MinMaxScaler()
+x_scaler = MinMaxScaler()
 
-X_train = scaler.fit_transform(X_train)
+X_train = x_scaler.fit_transform(X_train)
+
+y_test = x_scaler.transform(y_test)
 
 desc = pd.DataFrame(X_train.T).describe()
 
@@ -69,8 +72,16 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     mode='min',
     save_best_only=True)
 
+enc_model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+    filepath="/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/enc_model.h5",
+    save_weights_only=False,
+    monitor='val_loss',
+    mode='min',
+    save_best_only=True)
+
 autoencoder.model.fit(X_train, X_train, epochs=config["epochs"], validation_split=0.1, batch_size=2 ** 8,
-                      callbacks=[WandbCallback(save_model=False), model_checkpoint_callback])
+                      callbacks=[WandbCallback(save_model=False), model_checkpoint_callback,
+                                 enc_model_checkpoint_callback])
 
 wandb.log({"test_loss": autoencoder.model.evaluate(y_test, y_test)[0]})
 

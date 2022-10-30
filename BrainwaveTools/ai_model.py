@@ -1,7 +1,9 @@
 import math
+from functools import partial
 
 import tensorflow as tf
 from keras.layers.core import activation
+from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 from keras.optimizers import Adagrad, Adam
 from keras.layers.reshaping import Reshape
@@ -9,7 +11,7 @@ from keras.layers.rnn import TimeDistributed
 from keras.layers.convolutional import Convolution1DTranspose, Conv1D
 from keras import Sequential, Model, Input
 from keras.layers import Dense, MaxPool1D, Flatten, Attention, BatchNormalization, AvgPool1D, UpSampling1D, Dropout, \
-    Activation
+    Activation, Lambda
 
 
 def get_lr_metric(optimizer):
@@ -17,6 +19,24 @@ def get_lr_metric(optimizer):
         return optimizer._decayed_lr(tf.float32)  # I use ._decayed_lr method instead of .lr
 
     return lr
+
+
+class FFT(keras.layers.Layer):
+    def __init__(self, fft_length=500):
+        super(FFT, self).__init__()
+        self.fft_length = tf.constant(fft_length)
+
+    def call(self, inputs):
+        return tf.signal.rfft(inputs, fft_length=self.fft_length)
+
+
+class IFFT(keras.layers.Layer):
+    def __init__(self, fft_length=500):
+        super(IFFT, self).__init__()
+        self.fft_length = tf.convert_to_tensor(fft_length, dtype=tf.int32)
+
+    def call(self, inputs):
+        return tf.signal.irfft(inputs, fft_length=self.fft_length)
 
 
 class AutoEncoderModel:

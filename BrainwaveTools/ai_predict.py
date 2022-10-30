@@ -1,67 +1,51 @@
-import math
-import os
+import os.path
+from glob import glob
 
-import keras.models
 import numpy as np
-from sklearn.decomposition import KernelPCA
-from sklearn.preprocessing import RobustScaler, MinMaxScaler, quantile_transform, QuantileTransformer
-
-import datatypes
-
-import ai_model
-from sklearn.model_selection import train_test_split
+import tdt
+import argparse
+import keras
 import matplotlib.pyplot as plt
-import tensorflow as tf
-import wandb
-from keras import backend as be
-from wandb.keras import WandbCallback
-import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
-import plotly.express as px
 
-hyperparameter_defaults = dict(
-    epochs=10000,
-    window_size=10000,
-    compression_size=10,
-    learning_rate=6e-3,
-    initial_accumulator_value=0.95,
-    dropout=0.2
-)
+from datatypes import FiberPhotometryData, FiberPhotometryWindowData
 
-config = tf.compat.v1.ConfigProto()
 
-config.gpu_options.allow_growth = True
+def init_argparse() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        usage="%(prog)s [OPTION] [FILE]...",
+        description="Converts FiberPhotometryData File to FiberPhotometryWindowData"
+    )
+    parser.add_argument(
+        "-v", "--version", action="version",
+        version=f"{parser.prog} version 1.0.0"
+    )
+    parser.add_argument('input', nargs=1, type=str)
+    parser.add_argument('time_stamp', nargs=1, type=float)
+    return parser
 
-tf.compat.v1.Session(config=config)
 
-run = wandb.init(project="brainwaveAnalysis-BrainwaveTools", entity="bugsiesegal", config=hyperparameter_defaults)
+def main() -> None:
+    parser = init_argparse()
+    args = parser.parse_args()
+    window_data = FiberPhotometryWindowData.read(args.input[0])
+    data = window_data.data
 
-config = wandb.config
+    scaler = MinMaxScaler()
 
-print(config)
+    data = scaler.fit_transform(data)
 
-autoencoder = ai_model.AutoEncoderModel(config["window_size"], config["compression_size"], config["dropout"])
+    time = window_data.time_array
+    time_index = np.where(np.any(time == int(args.time_stamp[0]), axis=1))[0]
+    print(time_index)
+    print(data[time_index][0])
+    model = keras.models.load_model("/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/model.h5")
+    plt.plot(data[time_index][0])
+    plt.plot(model.predict(data[time_index])[0])
+    plt.show()
 
-autoencoder.make_model(config)
-autoencoder.summary()
 
-autoencoder.model.load_weights("/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/model.h5")
 
-data = datatypes.FiberPhotometryWindowData.read("/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fpw/10000/1.fpw").data
 
-data = data[np.where(np.any(data > 0.2, axis=1))]
-
-scaler = MinMaxScaler()
-
-data = scaler.fit_transform(data)
-
-desc = pd.DataFrame(data.T).describe()
-
-figs, axs = plt.subplots(1, 3)
-
-axs[0].plot(pd.DataFrame(data[desc.idxmax(axis=1)][:6]).T)
-axs[1].plot(pd.DataFrame(autoencoder.model.predict(data[desc.idxmax(axis=1)][:6], verbose=0)).T)
-print(autoencoder.encoder.predict(data[desc.idxmax(axis=1)][:6], verbose=0).shape)
-axs[2].plot(autoencoder.encoder.predict(data[desc.idxmax(axis=1)][:6], verbose=0))
-
-plt.show()
+if __name__ == "__main__":
+    main()
