@@ -72,8 +72,8 @@ class FiberPhotometryData(FileMixin):
         return self.data.shape
 
     def sliding_window(self, window_shape: int) -> FiberPhotometryWindowData:
-        w_data = self.data.flatten()[:self.data.flatten().size - (self.data.flatten().size % 10000)].reshape((-1, window_shape))
-        t_data = np.arange(0, self.data.flatten().size - (self.data.flatten().size % 10000), dtype=int).reshape((-1, window_shape))
+        w_data = self.data[0].flatten()[:self.data[0].flatten().size - (self.data[0].flatten().size % 10000)].reshape((-1, window_shape))
+        t_data = np.arange(0, self.data[0].flatten().size - (self.data[0].flatten().size % 10000), dtype=int).reshape((-1, window_shape))
         return FiberPhotometryWindowData(fs=self.fs,
                                          data=w_data,
                                          time=t_data

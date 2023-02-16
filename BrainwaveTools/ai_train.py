@@ -4,7 +4,7 @@ import os
 import keras.models
 import numpy as np
 from sklearn.decomposition import KernelPCA
-from sklearn.preprocessing import RobustScaler, MinMaxScaler, quantile_transform, QuantileTransformer
+from sklearn.preprocessing import RobustScaler, MinMaxScaler, quantile_transform, QuantileTransformer, normalize
 
 import datatypes
 
@@ -19,8 +19,8 @@ import pandas as pd
 import plotly.express as px
 
 hyperparameter_defaults = dict(
-    epochs=10000,
-    window_size=10000,
+    epochs=20,
+    window_size=1000,
     compression_size=10,
     learning_rate=1e-4,
     initial_accumulator_value=0.95,
@@ -48,22 +48,29 @@ autoencoder.summary()
 
 # autoencoder.model.load_weights("/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/model.h5")
 
-X_train = datatypes.FiberPhotometryWindowData.read("/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fpw/10000/3.fpw").data
+X_train = datatypes.FiberPhotometryData.read("/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fp/1.fp").data[0]
 
-y_test = datatypes.FiberPhotometryWindowData.read(
-    "/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fpw/10000/1.fpw").data
+y_test = datatypes.FiberPhotometryData.read("/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fp/1.fp")
 
-X_train = X_train[np.where(np.all(X_train > 0.2, axis=1))]
+z_data = y_test.sliding_window(config["window_size"]).data
 
-x_scaler = MinMaxScaler()
+y_test = y_test.data[0]
 
-X_train = x_scaler.fit_transform(X_train)
+X_train = normalize(X_train.reshape(1,-1)).reshape(-1,)
 
-y_test = x_scaler.transform(y_test)
+y_test = normalize(y_test.reshape(1,-1)).reshape(-1,)
 
-desc = pd.DataFrame(X_train.T).describe()
+print(pd.DataFrame(X_train.T).describe())
 
-print(desc)
+print(pd.DataFrame(y_test.T).describe())
+
+X_train_dataset = tf.keras.utils.timeseries_dataset_from_array(X_train[:-10000], X_train[:-10000], config["window_size"])
+
+X_val_dataset = tf.keras.utils.timeseries_dataset_from_array(X_train[-10000:], X_train[-10000:], config["window_size"])
+
+y_test_dataset = tf.keras.utils.timeseries_dataset_from_array(y_test, y_test, config["window_size"])
+
+
 
 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     filepath="/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/model.h5",
@@ -72,21 +79,26 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     mode='min',
     save_best_only=True)
 
-enc_model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath="/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/enc_model.h5",
-    save_weights_only=False,
-    monitor='val_loss',
-    mode='min',
-    save_best_only=True)
+autoencoder.model.fit(X_train_dataset, epochs=config["epochs"], validation_data=X_val_dataset,
+                      callbacks=[WandbCallback(save_model=False), model_checkpoint_callback])
 
-autoencoder.model.fit(X_train, X_train, epochs=config["epochs"], validation_split=0.1, batch_size=2 ** 8,
-                      callbacks=[WandbCallback(save_model=False), model_checkpoint_callback,
-                                 enc_model_checkpoint_callback])
+autoencoder.encoder.save("/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/enc_model.h5")
 
-wandb.log({"test_loss": autoencoder.model.evaluate(y_test, y_test)[0]})
+wandb.log({"test_loss": autoencoder.model.evaluate(y_test_dataset)[0]})
 
-wandb.log({"Actual": px.line(pd.DataFrame(y_test[:3]).T)})
-wandb.log({"Recreation": px.line(pd.DataFrame(autoencoder.model.predict(y_test[:3], verbose=0)).T)})
+pred = autoencoder.encoder.predict(y_test_dataset, verbose=0)
+
+print(pred.shape)
+
+print(pred[:10].T)
+
+for i in range(10):
+    plt.plot(pred.T[i])
+
+# wandb.log({"Pred": px.line(pred.T[0])})
+
+wandb.log({"Actual": px.line(pd.DataFrame(z_data[30].reshape((1,-1))).T)})
+wandb.log({"Recreation": px.line(pd.DataFrame(autoencoder.model.predict(z_data[30].reshape((1,-1)), verbose=0)).T)})
 wandb.log(
-    {"Encoded Values": px.bar(pd.DataFrame(autoencoder.encoder.predict(y_test[:3], verbose=0)), barmode='group')})
+    {"Encoded Values": plt.gcf()})
 wandb.finish()
