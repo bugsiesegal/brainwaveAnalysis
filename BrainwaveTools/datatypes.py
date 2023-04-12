@@ -25,7 +25,7 @@ class FiberPhotometryWindowData(FileMixin):
     shape: Data shape.
     """
 
-    fs: np.float
+    fs: np.float64
     data: np.ndarray
     time_array: np.ndarray
 
@@ -35,11 +35,11 @@ class FiberPhotometryWindowData(FileMixin):
         self.time_array = time
 
     @property
-    def frequency(self) -> np.float:
+    def frequency(self) -> np.float64:
         return 1 / self.fs
 
     @property
-    def time(self) -> np.float:
+    def time(self) -> np.float64:
         return self.data.shape[0] * self.frequency
 
     @property
@@ -56,15 +56,15 @@ class FiberPhotometryData(FileMixin):
     shape: Data shape.
     """
 
-    fs: np.float
+    fs: np.float64
     data: np.ndarray
 
     @property
-    def frequency(self) -> np.float:
+    def frequency(self) -> np.float64:
         return 1 / self.fs
 
     @property
-    def time(self) -> np.float:
+    def time(self) -> np.float64:
         return self.data.shape[0] * self.frequency
 
     @property
@@ -72,8 +72,8 @@ class FiberPhotometryData(FileMixin):
         return self.data.shape
 
     def sliding_window(self, window_shape: int) -> FiberPhotometryWindowData:
-        w_data = self.data[0].flatten()[:self.data[0].flatten().size - (self.data[0].flatten().size % 10000)].reshape((-1, window_shape))
-        t_data = np.arange(0, self.data[0].flatten().size - (self.data[0].flatten().size % 10000), dtype=int).reshape((-1, window_shape))
+        w_data = self.data[0].flatten()[:self.data[0].flatten().size - (self.data[0].flatten().size % window_shape)].reshape((-1, window_shape))
+        t_data = np.arange(0, self.data[0].flatten().size - (self.data[0].flatten().size % window_shape), dtype=int).reshape((-1, window_shape))
         return FiberPhotometryWindowData(fs=self.fs,
                                          data=w_data,
                                          time=t_data
