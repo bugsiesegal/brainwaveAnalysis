@@ -15,11 +15,11 @@ import datatypes
 
 
 hyperparameter_defaults = dict(
-    epochs=1000,
+    epochs=100,
     window_size=10000,
     compression_size=10,
-    learning_rate=1e-3,
-    dropout=0,
+    learning_rate=1e-4,
+    dropout=0.4,
     loss="mse",
     kernel_initializer="he_normal"
 )
@@ -75,7 +75,7 @@ y_test_file = "/home/bugsie/PycharmProjects/brainwaveAnalysis/Test/fp/3.fp"
 # Read and preprocess the data
 X_train, _ = read_and_preprocess_data(X_train_file)
 y_test, y_test_fp = read_and_preprocess_data(y_test_file)
-z_data = apply_sliding_window(y_test_fp, config["window_size"])
+z_data = apply_sliding_window(_, config["window_size"])
 
 # Normalize the data
 X_train = normalize_data(X_train)
@@ -85,16 +85,16 @@ z_data = normalize_data(z_data.reshape(-1, 1)).reshape(-1, config["window_size"]
 print(pd.DataFrame(X_train).describe())
 print(pd.DataFrame(z_data).describe())
 
-X_train_dataset = create_timeseries_dataset(X_train[:20000], config["window_size"])
+X_train_dataset = create_timeseries_dataset(X_train[:-20000], config["window_size"])
 X_val_dataset = create_timeseries_dataset(X_train[-20000:], config["window_size"])
-y_test_dataset = create_timeseries_dataset(X_train[:20000], config["window_size"])
+y_test_dataset = create_timeseries_dataset(X_train[:200000], config["window_size"])
 
 print(pd.DataFrame(z_data).shape)
 
 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     filepath="/home/bugsie/PycharmProjects/brainwaveAnalysis/Models/model.h5",
     save_weights_only=False,
-    monitor='val_loss',
+    monitor='loss',
     mode='min',
     save_best_only=True)
 

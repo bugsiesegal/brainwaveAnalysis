@@ -22,9 +22,6 @@ class RNNAutoEncoderModel:
         loss = config["loss"]
         dropout = config["dropout"]
 
-        # Preprocessing layer (Normalization)
-        # preprocessing_layer = LayerNormalization()
-
         # Encoder
         enc_input = Input((self.window_size,))
         # x = preprocessing_layer(enc_input)
@@ -40,6 +37,13 @@ class RNNAutoEncoderModel:
         x, _, _, _, _ = Bidirectional(LSTM(self.encoded_size, return_sequences=True, return_state=True,
                                            kernel_initializer=kernel_initializer))(x)
         x = Dropout(dropout)(x)
+        x, _, _, _, _ = Bidirectional(LSTM(self.encoded_size, return_sequences=True, return_state=True,
+                                           kernel_initializer=kernel_initializer))(x)
+        x = Dropout(dropout)(x)
+        x, _, _, _, _ = Bidirectional(LSTM(self.encoded_size, return_sequences=True, return_state=True,
+                                           kernel_initializer=kernel_initializer))(x)
+
+        x = Dropout(dropout)(x)
         x = LSTM(self.encoded_size,
                  kernel_initializer=kernel_initializer)(x)
         enc_out = Dense(self.encoded_size, activation="sigmoid",
@@ -50,6 +54,12 @@ class RNNAutoEncoderModel:
                           kernel_initializer=kernel_initializer)(enc_out)
         x = RepeatVector(self.window_size)(dec_input)
 
+        x, _, _, _, _ = Bidirectional(LSTM(self.encoded_size, return_sequences=True, return_state=True,
+                                           kernel_initializer=kernel_initializer))(x)
+        x = Dropout(dropout)(x)
+        x, _, _, _, _ = Bidirectional(LSTM(self.encoded_size, return_sequences=True, return_state=True,
+                                           kernel_initializer=kernel_initializer))(x)
+        x = Dropout(dropout)(x)
         x, _, _, _, _ = Bidirectional(LSTM(self.encoded_size, return_sequences=True, return_state=True,
                                            kernel_initializer=kernel_initializer))(x)
         x = Dropout(dropout)(x)
